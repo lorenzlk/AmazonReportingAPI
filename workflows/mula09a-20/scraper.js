@@ -212,7 +212,7 @@ export default defineComponent({
       });
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Set date range to target date (single day - yesterday by default)
+      // Set date range to yesterday using radio button (most reliable)
       console.log(`📅 Setting date range to ${targetDateDisplay}...`);
       let dateSetSuccessfully = false;
       
@@ -220,142 +220,146 @@ export default defineComponent({
         // Wait for page to fully load
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Try multiple approaches to set the date
-        const datePickerApproaches = [
-          // Approach 1: Look for date range picker button/link
-          async () => {
-            const dateRangeButtons = [
-              'button[aria-label*="date" i]',
-              'a[aria-label*="date" i]',
-              'button:has-text("Date")',
-              '.ac-widget-date-picker button',
-              '[data-testid*="date-range"]',
-              'button.ac-widget-button:has-text("Last")'
-            ];
-            
-            for (const btnSelector of dateRangeButtons) {
-              try {
-                const btn = await page.$(btnSelector);
-                if (btn) {
-                  console.log(`  Trying date range button: ${btnSelector}`);
-                  await btn.click();
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                  
-                  // Look for custom date range option
-                  const customRange = await page.$('a:has-text("Custom"), button:has-text("Custom"), [data-testid*="custom"]');
-                  if (customRange) {
-                    await customRange.click();
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                  }
-                  
-                  // Try to find start date input
-                  const startDateInputs = [
-                    'input[name*="start" i]',
-                    'input[aria-label*="start" i]',
-                    'input[placeholder*="start" i]',
-                    'input[type="date"]',
-                    '.ac-widget-date-picker input'
-                  ];
-                  
-                  for (const inputSelector of startDateInputs) {
-                    try {
-                      const input = await page.$(inputSelector);
-                      if (input) {
-                        await input.click({ clickCount: 3 });
-                        await input.type(targetDateStr, { delay: 30 });
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Try to set end date to same date (single day)
-                        const endDateInputs = [
-                          'input[name*="end" i]',
-                          'input[aria-label*="end" i]',
-                          'input[placeholder*="end" i]'
-                        ];
-                        
-                        for (const endSelector of endDateInputs) {
-                          try {
-                            const endInput = await page.$(endSelector);
-                            if (endInput) {
-                              await endInput.click({ clickCount: 3 });
-                              await endInput.type(targetDateStr, { delay: 30 });
-                              await new Promise(resolve => setTimeout(resolve, 500));
-                              break;
-                            }
-                          } catch (e) {}
-                        }
-                        
-                        // Click apply/submit
-                        const applySelectors = [
-                          'button:has-text("Apply")',
-                          'button[type="submit"]',
-                          'button.ac-widget-button-primary',
-                          '[data-testid="apply"]',
-                          'button:has-text("Go")'
-                        ];
-                        
-                        for (const applySel of applySelectors) {
-                          try {
-                            const applyBtn = await page.$(applySel);
-                            if (applyBtn) {
-                              await applyBtn.click();
-                              await new Promise(resolve => setTimeout(resolve, 3000));
-                              return true;
-                            }
-                          } catch (e) {}
-                        }
-                      }
-                    } catch (e) {}
-                  }
-                }
-              } catch (e) {}
-            }
-            return false;
-          },
-          
-          // Approach 2: Direct input field manipulation
-          async () => {
-            const inputSelectors = [
-              'input[placeholder*="date" i]',
-              'input[aria-label*="date" i]',
-              'input[name*="date" i]',
-              'input[type="date"]',
-              '.ac-widget-date-picker input',
-              'input.ac-widget-date-picker-input'
-            ];
-            
-            for (const selector of inputSelectors) {
-              try {
-                const input = await page.$(selector);
-                if (input) {
-                  console.log(`  Trying direct input: ${selector}`);
-                  await input.click({ clickCount: 3 });
-                  await page.keyboard.press('Backspace');
-                  await input.type(targetDateStr, { delay: 30 });
-                  await page.keyboard.press('Enter');
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                  return true;
-                }
-              } catch (e) {}
-            }
-            return false;
-          }
+        // Approach 1: Look for "Yesterday" radio button (most reliable)
+        console.log('  Looking for "Yesterday" radio button...');
+        const yesterdaySelectors = [
+          'input[type="radio"][value*="yesterday" i]',
+          'input[type="radio"][id*="yesterday" i]',
+          'input[type="radio"][name*="date" i] + label:has-text("Yesterday")',
+          'label:has-text("Yesterday") input[type="radio"]',
+          'input[type="radio"]:has-text("Yesterday")',
+          'input[type="radio"][aria-label*="yesterday" i]',
+          'input[type="radio"][aria-labelledby*="yesterday" i]',
+          'input[type="radio"]',
+          'label:has-text("Yesterday")',
+          '[role="radio"][aria-label*="yesterday" i]',
+          '[role="radio"]:has-text("Yesterday")'
         ];
         
-        // Try each approach
-        for (let attempt = 0; attempt < datePickerApproaches.length; attempt++) {
+        for (const selector of yesterdaySelectors) {
           try {
-            dateSetSuccessfully = await datePickerApproaches[attempt]();
-            if (dateSetSuccessfully) {
-              console.log(`  ✅ Date set to ${targetDateDisplay} using approach ${attempt + 1}`);
-              break;
+            // Try to find radio button or label
+            let element = await page.$(selector);
+            
+            // If selector is for label, try to find associated input
+            if (!element && selector.includes('label')) {
+              const label = await page.$(selector);
+              if (label) {
+                const labelFor = await label.evaluate(el => el.getAttribute('for'));
+                if (labelFor) {
+                  element = await page.$(`input#${labelFor}`);
+                }
+                if (!element) {
+                  // Try finding input near the label
+                  element = await page.evaluateHandle((label) => {
+                    const labelEl = document.querySelector(label);
+                    if (labelEl) {
+                      return labelEl.closest('label')?.querySelector('input[type="radio"]') ||
+                             labelEl.parentElement?.querySelector('input[type="radio"]') ||
+                             labelEl.querySelector('input[type="radio"]');
+                    }
+                    return null;
+                  }, selector);
+                }
+              }
             }
-          } catch (error) {
-            console.warn(`  ⚠️ Approach ${attempt + 1} failed: ${error.message}`);
+            
+            if (element) {
+              // Check if it's actually the "Yesterday" option
+              const text = await page.evaluate((el) => {
+                if (el) {
+                  const label = el.closest('label') || 
+                               document.querySelector(`label[for="${el.id}"]`) ||
+                               el.parentElement?.querySelector('label');
+                  return label ? label.textContent.trim().toLowerCase() : '';
+                }
+                return '';
+              }, element);
+              
+              if (text.includes('yesterday') || selector.includes('yesterday')) {
+                console.log(`  Found "Yesterday" option with selector: ${selector}`);
+                await element.click();
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Look for apply/submit button
+                const applySelectors = [
+                  'button:has-text("Apply")',
+                  'button[type="submit"]',
+                  'button.ac-widget-button-primary',
+                  '[data-testid="apply"]',
+                  'button:has-text("Go")',
+                  'button:has-text("Update")',
+                  'button:has-text("Filter")'
+                ];
+                
+                for (const applySel of applySelectors) {
+                  try {
+                    const applyBtn = await page.$(applySel);
+                    if (applyBtn) {
+                      await applyBtn.click();
+                      await new Promise(resolve => setTimeout(resolve, 3000));
+                      dateSetSuccessfully = true;
+                      console.log(`  ✅ Selected "Yesterday" and applied`);
+                      break;
+                    }
+                  } catch (e) {}
+                }
+                
+                if (dateSetSuccessfully) break;
+              }
+            }
+          } catch (e) {
+            // Try next selector
+          }
+        }
+        
+        // Approach 2: If radio button not found, try clicking "Yesterday" text/label directly
+        if (!dateSetSuccessfully) {
+          console.log('  Trying to click "Yesterday" text directly...');
+          try {
+            const yesterdayText = await page.evaluateHandle(() => {
+              const allElements = Array.from(document.querySelectorAll('*'));
+              for (const el of allElements) {
+                const text = el.textContent?.trim().toLowerCase() || '';
+                if (text === 'yesterday' || text.includes('yesterday')) {
+                  // Check if it's clickable (label, button, link, or has click handler)
+                  if (el.tagName === 'LABEL' || el.tagName === 'BUTTON' || el.tagName === 'A' || 
+                      el.onclick || el.getAttribute('role') === 'button') {
+                    return el;
+                  }
+                  // Or find parent that's clickable
+                  let parent = el.parentElement;
+                  while (parent && parent !== document.body) {
+                    if (parent.tagName === 'LABEL' || parent.onclick) {
+                      return parent;
+                    }
+                    parent = parent.parentElement;
+                  }
+                }
+              }
+              return null;
+            });
+            
+            if (yesterdayText && yesterdayText.asElement()) {
+              await yesterdayText.asElement().click();
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              
+              // Look for apply button
+              const applyBtn = await page.$('button:has-text("Apply"), button[type="submit"], button.ac-widget-button-primary');
+              if (applyBtn) {
+                await applyBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                dateSetSuccessfully = true;
+                console.log(`  ✅ Clicked "Yesterday" text and applied`);
+              }
+            }
+          } catch (e) {
+            console.warn(`  ⚠️ Could not click "Yesterday" text: ${e.message}`);
           }
         }
         
         if (!dateSetSuccessfully) {
-          console.warn('  ⚠️ Could not set date picker - Amazon may be using default date range');
+          console.warn('  ⚠️ Could not find "Yesterday" radio button or option');
           console.warn(`  ⚠️ WARNING: Data may not be for ${targetDateDisplay}`);
           console.warn(`  💡 Data will be labeled as ${targetDateStr} in results, but actual data may differ`);
         }
