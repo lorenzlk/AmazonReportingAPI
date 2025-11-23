@@ -2,7 +2,7 @@
  * Google Sheets Writer - mula09a-20
  * 
  * This step receives results from the mula09a-20 scraper
- * and saves them to Google Sheets tab "Sheet1"
+ * and saves them to Google Sheets tab "mula09a-20"
  * 
  * SETUP:
  * 1. Connect Google Sheets app in props
@@ -54,10 +54,10 @@ export default defineComponent({
       console.log(`Processing: ${trackingId} (Store: ${storeId})`);
       
       try {
-        // Use "Sheet1" as tab name for mula09a-20
-        const tabName = 'Sheet1';
+        // Use trackingId as tab name (consistent with other Store IDs)
+        const tabName = trackingId;
         
-        // Check if tab exists
+        // Check if tab exists, create if not
         let tabExists = false;
         try {
           const sheetInfoResponse = await axios.get(

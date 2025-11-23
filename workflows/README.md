@@ -33,13 +33,15 @@ workflows/
 
 ### mula09a-20
 - **Tracking IDs**: 1 (mula09a-20)
-- **Google Sheet Tab**: `Sheet1`
+- **Google Sheet Tab**: `mula09a-20`
 - **Sheet ID**: `1TBvJZS9KkdP6VBeZ-YZIJ6NxqAn2bAnBzjRTqK9qPWU`
+- **Sheet Name**: "Amazon Associates Reporting"
 
 ### bm01f-20
 - **Tracking IDs**: 1 (mula07-20)
 - **Google Sheet Tab**: `mula07-20`
 - **Sheet ID**: `1TBvJZS9KkdP6VBeZ-YZIJ6NxqAn2bAnBzjRTqK9qPWU`
+- **Sheet Name**: "Amazon Associates Reporting"
 
 ### tag0d1d-20
 - **Tracking IDs**: 6
@@ -51,11 +53,13 @@ workflows/
   - on3m-20
 - **Google Sheet Tabs**: One tab per Tracking ID (named after Tracking ID)
 - **Sheet ID**: `1TBvJZS9KkdP6VBeZ-YZIJ6NxqAn2bAnBzjRTqK9qPWU`
+- **Sheet Name**: "Amazon Associates Reporting"
 
 ### usmagazine05-20
 - **Tracking IDs**: 1 (mula0f-20)
 - **Google Sheet Tab**: `mula0f-20`
 - **Sheet ID**: `1TBvJZS9KkdP6VBeZ-YZIJ6NxqAn2bAnBzjRTqK9qPWU`
+- **Sheet Name**: "Amazon Associates Reporting"
 
 ## Benefits
 
