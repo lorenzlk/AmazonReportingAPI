@@ -1,0 +1,42 @@
+{
+  "name": "amazon-associates-reporting",
+  "version": "1.0.0",
+  "description": "Automated scraping and reporting for Amazon Associates accounts",
+  "main": "src/scraper/amazon-associates-scraper.js",
+  "scripts": {
+    "scrape": "node src/scraper/amazon-associates-scraper.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.js"
+  },
+  "keywords": [
+    "amazon",
+    "associates",
+    "scraping",
+    "puppeteer",
+    "automation",
+    "reporting"
+  ],
+  "author": "Logan Lorenz",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^21.5.0",
+    "googleapis": "^128.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.54.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/amazon-associates-reporting"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/amazon-associates-reporting/issues"
+  }
+}
+

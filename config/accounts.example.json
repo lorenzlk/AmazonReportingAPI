@@ -1,0 +1,33 @@
+{
+  "accounts": [
+    {
+      "id": "account-1",
+      "name": "Primary Store",
+      "sheetId": "YOUR_GOOGLE_SHEET_ID_HERE",
+      "description": "Main Amazon Associates account"
+    },
+    {
+      "id": "account-2",
+      "name": "Secondary Store",
+      "sheetId": "YOUR_GOOGLE_SHEET_ID_HERE",
+      "description": "Secondary Amazon Associates account"
+    },
+    {
+      "id": "account-3",
+      "name": "Third Store",
+      "sheetId": "YOUR_GOOGLE_SHEET_ID_HERE",
+      "description": "Third Amazon Associates account"
+    }
+  ],
+  "defaults": {
+    "sheetTabName": "Daily Data",
+    "timezone": "America/New_York",
+    "dateFormat": "YYYY-MM-DD"
+  },
+  "scraping": {
+    "extractProducts": true,
+    "maxProducts": 100,
+    "delayBetweenAccounts": 3000
+  }
+}
+

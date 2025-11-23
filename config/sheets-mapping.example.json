@@ -1,0 +1,54 @@
+{
+  "account-1": {
+    "sheetId": "1ABC_REPLACE_WITH_ACTUAL_SHEET_ID_XYZ",
+    "tabName": "Daily Data",
+    "headers": [
+      "Date",
+      "Account Name",
+      "Revenue",
+      "Earnings",
+      "Clicks",
+      "Orders",
+      "Conversion Rate",
+      "Items Ordered",
+      "Items Shipped",
+      "Revenue Per Click",
+      "Last Updated"
+    ]
+  },
+  "account-2": {
+    "sheetId": "2DEF_REPLACE_WITH_ACTUAL_SHEET_ID_UVW",
+    "tabName": "Daily Data",
+    "headers": [
+      "Date",
+      "Account Name",
+      "Revenue",
+      "Earnings",
+      "Clicks",
+      "Orders",
+      "Conversion Rate",
+      "Items Ordered",
+      "Items Shipped",
+      "Revenue Per Click",
+      "Last Updated"
+    ]
+  },
+  "account-3": {
+    "sheetId": "3GHI_REPLACE_WITH_ACTUAL_SHEET_ID_RST",
+    "tabName": "Daily Data",
+    "headers": [
+      "Date",
+      "Account Name",
+      "Revenue",
+      "Earnings",
+      "Clicks",
+      "Orders",
+      "Conversion Rate",
+      "Items Ordered",
+      "Items Shipped",
+      "Revenue Per Click",
+      "Last Updated"
+    ]
+  }
+}
+
