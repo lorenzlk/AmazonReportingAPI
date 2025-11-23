@@ -508,11 +508,11 @@ export default defineComponent({
                     const pages = await browser.pages();
                     page = pages[pages.length - 1];
                     await page.setViewport({ width: 1920, height: 1080 });
-                    await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
-                      waitUntil: 'domcontentloaded',
-                      timeout: 15000
-                    });
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+                await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
+                  waitUntil: 'domcontentloaded',
+                  timeout: 15000
+                });
+                await new Promise(resolve => setTimeout(resolve, 2000));
                   } else {
                     // Just refresh the page
                     await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
