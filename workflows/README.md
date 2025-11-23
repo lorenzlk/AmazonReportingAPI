@@ -8,7 +8,7 @@ This directory contains organized workflow scripts, one folder per Store ID.
 workflows/
 ├── mula09a-20/
 │   ├── scraper.js          # Scraper for mula09a-20 (1 Tracking ID)
-│   └── google-sheets.js    # Saves to "Sheet1" tab
+│   └── google-sheets.js    # Saves to "mula09a-20" tab
 ├── bm01f-20/
 │   ├── scraper.js          # Scraper for bm01f-20 (1 Tracking ID)
 │   └── google-sheets.js    # Saves to "mula07-20" tab
