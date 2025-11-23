@@ -142,9 +142,16 @@ export default defineComponent({
               timeout: 10000
             });
           }
-          // Wait for reports page to load
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          console.log('✅ Login successful! Now on reports page.');
+          // Wait for reports page to fully load
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Verify we're on the reports page and it's loaded
+          try {
+            await page.waitForSelector('#a-autoid-0-announce, #ac-report-commission-commision-total', { timeout: 10000 });
+            console.log('✅ Login successful! Reports page loaded.');
+          } catch (e) {
+            console.warn('⚠️ Reports page may not be fully loaded, but continuing...');
+          }
         }
         isLoggedIn = true;
         return true;
@@ -164,9 +171,13 @@ export default defineComponent({
         throw new Error('Initial login failed');
       }
       
+      // Wait a bit for page to fully stabilize after login
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Check current Store ID and switch if needed
       try {
-        await page.waitForSelector('#a-autoid-0-announce', { timeout: 10000 });
+        // Wait for Store ID selector with longer timeout
+        await page.waitForSelector('#a-autoid-0-announce', { timeout: 15000 });
         const currentStore = await page.$eval('#a-autoid-0-announce > span.a-dropdown-prompt', el => el.textContent.trim());
         console.log(`📍 Current Store ID: ${currentStore}`);
         
@@ -508,11 +519,11 @@ export default defineComponent({
                     const pages = await browser.pages();
                     page = pages[pages.length - 1];
                     await page.setViewport({ width: 1920, height: 1080 });
-                await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
-                  waitUntil: 'domcontentloaded',
-                  timeout: 15000
-                });
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                    await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
+                      waitUntil: 'domcontentloaded',
+                      timeout: 15000
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                   } else {
                     // Just refresh the page
                     await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -530,21 +541,62 @@ export default defineComponent({
             const errorMsg = evalError.message || String(evalError);
             console.warn(`  ⚠️ Data extraction failed (attempt ${extractionAttempts}): ${errorMsg}`);
             
-            // If detached frame error, try to recover
+            // If detached frame error, try to recover by creating a completely new page
             if (errorMsg.includes('detached') || errorMsg.includes('Frame')) {
-              console.log('  🔄 Detached frame detected, recovering...');
+              console.log('  🔄 Detached frame detected, creating new page...');
               try {
-                if (page.isClosed()) {
-                  const pages = await browser.pages();
-                  page = pages[pages.length - 1];
-                  await page.setViewport({ width: 1920, height: 1080 });
+                // Close the detached page if possible
+                try {
+                  if (page && !page.isClosed()) {
+                    await page.close();
+                  }
+                } catch (closeError) {
+                  // Ignore close errors
                 }
-                // Refresh the reports page
+                
+                // Create a completely new page
+                page = await browser.newPage();
+                await page.setViewport({ width: 1920, height: 1080 });
+                
+                // Navigate to reports page and re-login if needed
                 await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
                   waitUntil: 'domcontentloaded',
                   timeout: 15000
                 });
                 await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Check if we need to login again
+                const currentUrl = page.url();
+                if (currentUrl.includes('signin') || currentUrl.includes('ap/signin')) {
+                  console.log('  🔐 Need to login again...');
+                  isLoggedIn = false;
+                  await login();
+                }
+                
+                // Re-switch Store ID
+                try {
+                  await page.waitForSelector('#a-autoid-0-announce', { timeout: 10000 });
+                  const currentStore = await page.$eval('#a-autoid-0-announce > span.a-dropdown-prompt', el => el.textContent.trim());
+                  if (!currentStore.includes(STORE_ID)) {
+                    await page.click('#a-autoid-0-announce');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    const storeFound = await page.evaluate((storeId) => {
+                      for (let i = 1; i <= 10; i++) {
+                        const el = document.querySelector(`#menu-tab-store-id-picker_${i}`);
+                        if (el && el.textContent.includes(storeId)) return i;
+                      }
+                      return null;
+                    }, STORE_ID);
+                    if (storeFound) {
+                      await page.click(`#menu-tab-store-id-picker_${storeFound}`);
+                      await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
+                  }
+                } catch (storeError) {
+                  console.warn('  ⚠️ Could not re-switch Store ID after recovery');
+                }
+                
+                console.log('  ✅ Recovered with new page');
               } catch (recoverError) {
                 console.warn(`  ⚠️ Could not recover from detached frame: ${recoverError.message}`);
               }
