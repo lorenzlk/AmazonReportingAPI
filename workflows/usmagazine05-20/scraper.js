@@ -23,38 +23,23 @@ export default defineComponent({
       type: "app",
       app: "browserless",
     },
-    reportDate: {
-      type: "string",
-      label: "Report Date",
-      description: "Date to scrape: 'yesterday', 'today', or YYYY-MM-DD format. Default: yesterday",
-      default: "yesterday"
-    }
+    // Removed reportDate prop - always scrapes yesterday's data
   },
   async run({ steps, $ }) {
-    const reportDateInput = this.reportDate || 'yesterday';
+    // Always use yesterday's data
+    const reportDateInput = 'yesterday';
     
-    // Calculate target date
-    let targetDate;
+    // Calculate target date (yesterday)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    if (reportDateInput === 'yesterday') {
-      targetDate = new Date(today);
-      targetDate.setDate(today.getDate() - 1);
-    } else if (reportDateInput === 'today') {
-      targetDate = new Date(today);
-    } else {
-      targetDate = new Date(reportDateInput);
-      if (isNaN(targetDate.getTime())) {
-        throw new Error(`Invalid date format: ${reportDateInput}. Use 'yesterday', 'today', or YYYY-MM-DD`);
-      }
-    }
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() - 1);
     
     const targetDateStr = targetDate.toISOString().split('T')[0];
     const targetDateDisplay = targetDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     
     console.log(`🚀 Starting scraper for Store ID: ${STORE_ID}`);
-    console.log(`📅 Target date: ${targetDateDisplay} (${targetDateStr})`);
+    console.log(`📅 Scraping yesterday's data: ${targetDateDisplay} (${targetDateStr})`);
     console.log(`📊 Will process ${TRACKING_IDS.length} Tracking ID(s): ${TRACKING_IDS.join(', ')}`);
     
     const browserlessToken = this.browserless.$auth.api_key;
