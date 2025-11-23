@@ -33,7 +33,7 @@ export default defineComponent({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(today);
-    targetDate.setDate(today.getDate() - 1);
+      targetDate.setDate(today.getDate() - 1);
     
     const targetDateStr = targetDate.toISOString().split('T')[0];
     const targetDateDisplay = targetDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -89,7 +89,7 @@ export default defineComponent({
               throw new Error('Browserless rate limit exceeded. Please wait a few minutes before retrying.');
             } else {
               console.error('❌ Could not connect to browser:', errorMsg);
-              throw err;
+            throw err;
             }
           }
         }
@@ -370,16 +370,61 @@ export default defineComponent({
             dateSetSuccessfully = true;
             console.log(`  ✅ Date set to ${targetDateDisplay}`);
             
-            // Verify the date was actually changed by checking the page
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            const dateRangeText = await page.evaluate(() => {
-              const allText = document.body.textContent || '';
-              // Check if we see "Yesterday" or the target date in the date range display
-              return allText.includes('Yesterday') || allText.includes('Nov 22 2025');
-            });
-            
-            if (!dateRangeText) {
-              console.warn('  ⚠️ Date range may not have updated - checking again...');
+            // After date change, page may reload - get fresh page reference
+            try {
+              const pages = await browser.pages();
+              page = pages[pages.length - 1];
+              await page.setViewport({ width: 1920, height: 1080 });
+              
+              // Re-navigate to ensure fresh context
+              await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
+                waitUntil: 'domcontentloaded',
+                timeout: 15000
+              });
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              
+              // Re-switch Store ID if needed (page reload may have reset it)
+              try {
+                await page.waitForSelector('#a-autoid-0-announce', { timeout: 10000 });
+                const currentStore = await page.$eval('#a-autoid-0-announce > span.a-dropdown-prompt', el => el.textContent.trim());
+                if (!currentStore.includes(STORE_ID)) {
+                  console.log('  🔄 Re-switching to Store ID after date change...');
+                  await page.click('#a-autoid-0-announce');
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  const storeFound = await page.evaluate((storeId) => {
+                    for (let i = 1; i <= 10; i++) {
+                      const el = document.querySelector(`#menu-tab-store-id-picker_${i}`);
+                      if (el && el.textContent.includes(storeId)) return i;
+                    }
+                    return null;
+                  }, STORE_ID);
+                  if (storeFound) {
+                    await page.click(`#menu-tab-store-id-picker_${storeFound}`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
+                      waitUntil: 'domcontentloaded',
+                      timeout: 15000
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                  }
+                }
+              } catch (e) {
+                console.warn('  ⚠️ Could not verify/re-switch Store ID after date change');
+              }
+              
+              // Verify the date was actually changed
+              const dateRangeText = await page.evaluate(() => {
+                const allText = document.body.textContent || '';
+                return allText.includes('Yesterday') || allText.includes('Nov 22 2025');
+              });
+              
+              if (!dateRangeText) {
+                console.warn('  ⚠️ Date range may not have updated - page may still show previous range');
+              } else {
+                console.log('  ✅ Verified date range updated');
+              }
+            } catch (recoveryError) {
+              console.warn(`  ⚠️ Error recovering page after date change: ${recoveryError.message}`);
             }
           } else {
             console.warn('  ⚠️ Could not find "Apply" button');
@@ -397,6 +442,26 @@ export default defineComponent({
       } catch (error) {
         console.warn(`  ⚠️ Error setting date range: ${error.message}`);
         console.warn(`  ⚠️ WARNING: Data may not be for ${targetDateDisplay}`);
+      }
+      
+      // Ensure we have a fresh page reference before data extraction
+      try {
+        if (page && !page.isClosed()) {
+          // Test if page is still valid
+          await page.evaluate(() => document.title);
+        } else {
+          throw new Error('Page is closed');
+        }
+      } catch (e) {
+        console.log('  🔄 Getting fresh page reference before data extraction...');
+        const pages = await browser.pages();
+        page = pages[pages.length - 1];
+        await page.setViewport({ width: 1920, height: 1080 });
+        await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
+          waitUntil: 'domcontentloaded',
+          timeout: 15000
+        });
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
       // Process each Tracking ID
