@@ -1,8 +1,8 @@
 /**
- * Amazon Associates Scraper - mula09a-20
+ * Amazon Associates Scraper - usmagazine05-20
  * 
- * This workflow scrapes data for Store ID: mula09a-20
- * Tracking IDs: mula09a-20
+ * This workflow scrapes data for Store ID: usmagazine05-20
+ * Tracking IDs: mula0f-20
  * 
  * SETUP:
  * 1. Connect Browserless app in props
@@ -66,8 +66,8 @@ export default defineComponent({
     let page = null;
     let isLoggedIn = false;
     
-    // Helper function to connect to browser
-    const connectBrowser = async () => {
+    // Helper function to connect to browser with retry logic for rate limits
+    const connectBrowser = async (retryCount = 0, maxRetries = 3) => {
       if (browser) {
         try {
           await browser.disconnect();
@@ -88,9 +88,24 @@ export default defineComponent({
           console.log('✅ Connected to browser!');
           return true;
         } catch (err) {
+          const errorMsg = err.message || String(err);
+          const isRateLimit = errorMsg.includes('429') || errorMsg.includes('Too Many Requests') || errorMsg.includes('rate limit');
+          
+          if (isRateLimit && retryCount < maxRetries) {
+            const waitTime = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+            console.warn(`⚠️ Rate limited (429). Waiting ${waitTime/1000}s before retry ${retryCount + 1}/${maxRetries}...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            return await connectBrowser(retryCount + 1, maxRetries);
+          }
+          
           if (i === endpoints.length - 1) {
-            console.error('❌ Could not connect to browser');
-            throw err;
+            if (isRateLimit) {
+              console.error('❌ Could not connect to browser: Rate limited. Please wait a few minutes and try again.');
+              throw new Error('Browserless rate limit exceeded. Please wait a few minutes before retrying.');
+            } else {
+              console.error('❌ Could not connect to browser:', errorMsg);
+              throw err;
+            }
           }
         }
       }
