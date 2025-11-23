@@ -36,7 +36,8 @@ export default defineComponent({
     
     console.log(`Found ${results.length} results from Store ID: ${storeId}`);
     
-    const sheetId = process.env.GOOGLE_SHEET_ID || '1fDdgQNV_YT5Zvksv4JVI45kv2DFtSOvikScZq9HAsiM';
+    // Updated sheet ID: Amazon Associates Reporting
+    const sheetId = process.env.GOOGLE_SHEET_ID || '1TBvJZS9KkdP6VBeZ-YZIJ6NxqAn2bAnBzjRTqK9qPWU';
     const oauthToken = this.google_sheets.$auth.oauth_access_token;
     
     if (!oauthToken) {
@@ -56,6 +57,10 @@ export default defineComponent({
       console.log(`Processing: ${trackingId} (Store: ${storeId})`);
       
       try {
+        // Determine tab name: use "Sheet1" for mula09a-20, otherwise use trackingId
+        // This can be customized per Store ID if needed
+        const tabName = (storeId === 'mula09a-20' && trackingId === 'mula09a-20') ? 'Sheet1' : trackingId;
+        
         // Check if tab exists, create if not
         let tabExists = false;
         try {
@@ -66,13 +71,13 @@ export default defineComponent({
           
           const sheetInfo = sheetInfoResponse.data || sheetInfoResponse;
           const sheets = sheetInfo.sheets || [];
-          tabExists = sheets.some(sheet => sheet.properties.title === trackingId);
+          tabExists = sheets.some(sheet => sheet.properties.title === tabName);
         } catch (error) {
           console.warn('⚠️ Could not check for existing tab:', error.message);
         }
         
         if (!tabExists) {
-          console.log(`Creating new tab: ${trackingId}`);
+          console.log(`Creating new tab: ${tabName}`);
           try {
             await axios.post(
               `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`,
@@ -80,7 +85,7 @@ export default defineComponent({
                 requests: [{
                   addSheet: {
                     properties: {
-                      title: trackingId
+                      title: tabName
                     }
                   }
                 }]
@@ -90,7 +95,7 @@ export default defineComponent({
             
             // Add headers to new tab
             await axios.post(
-              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${trackingId}!A1:Z1:append?valueInputOption=RAW`,
+              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabName}!A1:Z1:append?valueInputOption=RAW`,
               {
                 values: [[
                   'Date',
@@ -110,13 +115,52 @@ export default defineComponent({
               },
               { headers }
             );
-            console.log(`✅ Created tab and headers for ${trackingId}`);
+            console.log(`✅ Created tab and headers for ${tabName}`);
           } catch (error) {
             if (error.response?.status === 400) {
               console.warn('⚠️ Tab might already exist, continuing...');
+              // Tab exists, continue
+              tabExists = true;
             } else {
               console.warn('⚠️ Could not create tab:', error.message);
             }
+          }
+        }
+        
+        // Check if headers exist, add if not (for existing tabs like Sheet1)
+        if (tabExists) {
+          try {
+            const headerCheck = await axios.get(
+              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabName}!A1:Z1`,
+              { headers }
+            );
+            const existingHeaders = headerCheck.data?.values?.[0] || [];
+            if (existingHeaders.length === 0 || !existingHeaders.includes('Date')) {
+              console.log(`Adding headers to existing tab: ${tabName}`);
+              await axios.put(
+                `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabName}!A1:M1?valueInputOption=RAW`,
+                {
+                  values: [[
+                    'Date',
+                    'Account Name',
+                    'Store ID',
+                    'Tracking ID',
+                    'Revenue',
+                    'Earnings',
+                    'Clicks',
+                    'Orders',
+                    'Conversion Rate',
+                    'Items Ordered',
+                    'Items Shipped',
+                    'Revenue Per Click',
+                    'Last Updated'
+                  ]]
+                },
+                { headers }
+              );
+            }
+          } catch (error) {
+            console.warn('⚠️ Could not check/add headers:', error.message);
           }
         }
         
@@ -124,7 +168,7 @@ export default defineComponent({
         let existingRowIndex = null;
         try {
           const readResponse = await axios.get(
-            `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${trackingId}!A2:Z1000`,
+            `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabName}!A2:Z1000`,
             { headers }
           );
           
@@ -164,7 +208,7 @@ export default defineComponent({
           console.log(`Updating existing row ${existingRowIndex} for ${trackingId} on ${date}`);
           try {
             await axios.put(
-              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${trackingId}!A${existingRowIndex}:Z${existingRowIndex}?valueInputOption=RAW`,
+              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabName}!A${existingRowIndex}:M${existingRowIndex}?valueInputOption=RAW`,
               {
                 values: [rowData]
               },
@@ -180,7 +224,7 @@ export default defineComponent({
           console.log(`Appending new row for ${trackingId} on ${date}`);
           try {
             await axios.post(
-              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${trackingId}!A:Z:append?valueInputOption=RAW`,
+              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabName}!A:Z:append?valueInputOption=RAW`,
               {
                 values: [rowData]
               },

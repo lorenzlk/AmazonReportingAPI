@@ -54,7 +54,7 @@ Before starting, make sure you have:
    - Press Enter to save
 
 3. **Copy Scraper Code**
-   - Open the file: `pipedream-single-store-scraper.js` from your local project
+   - Open the file: `workflows/mula09a-20/scraper.js` from your local project
    - Select ALL the code (Cmd+A / Ctrl+A)
    - Copy it (Cmd+C / Ctrl+C)
    - Go back to Pipedream
@@ -104,23 +104,13 @@ Before starting, make sure you have:
    - Press Enter
 
 3. **Copy Google Sheets Code**
-   - Open the file: `pipedream-google-sheets-single-store.js` from your local project
+   - Open the file: `workflows/mula09a-20/google-sheets.js` from your local project
    - Select ALL the code (Cmd+A / Ctrl+A)
    - Copy it (Cmd+C / Ctrl+C)
    - Go back to Pipedream
    - Delete any default code
    - Paste the code (Cmd+V / Ctrl+V)
-
-4. **Update Step Reference**
-   - In the code, find this line (around line 20-25):
-     ```javascript
-     const scraperStep = steps.scraper || steps.trigger;
-     ```
-   - Change it to match your scraper step name:
-     ```javascript
-     const scraperStep = steps["Scraper - mula09a-20"] || steps.trigger;
-     ```
-   - Make sure the step name matches exactly (including capitalization and spaces)
+   - **Note**: Step reference is already set to `steps["Scraper - mula09a-20"]` - no changes needed!
 
 5. **Configure Props - Google Sheets**
    - Click the **"Props"** tab
