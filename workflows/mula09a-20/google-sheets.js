@@ -72,7 +72,57 @@ export default defineComponent({
           console.warn('⚠️ Could not check for existing tab:', error.message);
         }
         
-        // Check if headers exist, add if not (for existing tabs like Sheet1)
+        if (!tabExists) {
+          console.log(`Creating new tab: ${tabName}`);
+          try {
+            await axios.post(
+              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`,
+              {
+                requests: [{
+                  addSheet: {
+                    properties: {
+                      title: tabName
+                    }
+                  }
+                }]
+              },
+              { headers }
+            );
+            
+            // Add headers to new tab
+            await axios.post(
+              `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabName}!A1:Z1:append?valueInputOption=RAW`,
+              {
+                values: [[
+                  'Date',
+                  'Account Name',
+                  'Store ID',
+                  'Tracking ID',
+                  'Revenue',
+                  'Earnings',
+                  'Clicks',
+                  'Orders',
+                  'Conversion Rate',
+                  'Items Ordered',
+                  'Items Shipped',
+                  'Revenue Per Click',
+                  'Last Updated'
+                ]]
+              },
+              { headers }
+            );
+            console.log(`✅ Created tab and headers for ${tabName}`);
+          } catch (error) {
+            if (error.response?.status === 400) {
+              console.warn('⚠️ Tab might already exist, continuing...');
+              tabExists = true;
+            } else {
+              console.warn('⚠️ Could not create tab:', error.message);
+            }
+          }
+        }
+        
+        // Check if headers exist, add if not (for existing tabs)
         if (tabExists) {
           try {
             const headerCheck = await axios.get(
