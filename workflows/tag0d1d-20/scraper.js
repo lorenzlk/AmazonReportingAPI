@@ -222,120 +222,176 @@ export default defineComponent({
         
         // Step 1: Open the date picker popup by clicking on the date range display
         console.log('  Opening date picker popup...');
-        const dateRangeSelectors = [
-          'button[aria-label*="date" i]',
-          'a[aria-label*="date" i]',
-          'button:has-text("Last")',
-          '.ac-widget-date-picker button',
-          '[data-testid*="date-range"]',
-          'span:has-text("Last 30 Days")',
-          'span:has-text("Oct")', // Part of date range display
-          'div:has-text("Last 30 Days")',
-          'div:has-text("Oct 24")'
-        ];
         
-        let popupOpened = false;
-        for (const selector of dateRangeSelectors) {
-          try {
-            const dateBtn = await page.$(selector);
-            if (dateBtn) {
-              console.log(`  Clicking date range selector: ${selector}`);
-              await dateBtn.click();
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              
-              // Check if popup opened (look for popover)
-              const popup = await page.$('#a-popover-1, .a-popover, [id^="a-popover"]');
-              if (popup) {
-                popupOpened = true;
-                console.log('  ✅ Date picker popup opened');
-                break;
+        // Use evaluate to find and click the date range element more reliably
+        const popupOpened = await page.evaluate(() => {
+          // Look for elements containing date range text like "Last 30 Days" or date ranges
+          const allElements = Array.from(document.querySelectorAll('*'));
+          for (const el of allElements) {
+            const text = el.textContent?.trim() || '';
+            // Look for date range patterns
+            if (text.includes('Last 30 Days') || text.includes('Last 7 Days') || 
+                (text.match(/\w{3} \d{1,2} \d{4}/) && text.includes('-'))) {
+              // Check if it's clickable
+              const style = window.getComputedStyle(el);
+              if (style.cursor === 'pointer' || el.onclick || 
+                  el.tagName === 'BUTTON' || el.tagName === 'A' ||
+                  el.closest('button') || el.closest('a')) {
+                const clickable = el.closest('button') || el.closest('a') || el;
+                clickable.click();
+                return true;
               }
             }
-          } catch (e) {}
+          }
+          return false;
+        });
+        
+        if (popupOpened) {
+          console.log('  ✅ Clicked date range display');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+          // Fallback: try common selectors
+          const dateRangeSelectors = [
+            'button[aria-label*="date" i]',
+            'a[aria-label*="date" i]',
+            'span:has-text("Last 30 Days")',
+            'div:has-text("Last 30 Days")'
+          ];
+          
+          for (const selector of dateRangeSelectors) {
+            try {
+              const dateBtn = await page.$(selector);
+              if (dateBtn) {
+                console.log(`  Trying selector: ${selector}`);
+                await dateBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                break;
+              }
+            } catch (e) {}
+          }
         }
         
-        if (!popupOpened) {
-          console.warn('  ⚠️ Could not open date picker popup');
-        }
+        // Wait a bit for popup to appear
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
         // Step 2: Find and click "Yesterday" radio button in the popup
-        if (popupOpened || await page.$('#a-popover-1, .a-popover')) {
-          console.log('  Looking for "Yesterday" radio button in popup...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('  Looking for "Yesterday" radio button in popup...');
+        
+        const yesterdaySelected = await page.evaluate(() => {
+          // Find the popover (it might have different IDs)
+          const popovers = document.querySelectorAll('[id^="a-popover"], .a-popover, [class*="popover"]');
           
-          // Try to find "Yesterday" radio button using multiple strategies
-          const yesterdayFound = await page.evaluate(() => {
-            // Find the popover
-            const popover = document.querySelector('#a-popover-1, .a-popover, [id^="a-popover"]');
-            if (!popover) return false;
+          for (const popover of popovers) {
+            // Check if popover is visible
+            const style = window.getComputedStyle(popover);
+            if (style.display === 'none' || style.visibility === 'hidden') continue;
             
             // Look for all radio buttons in the popover
             const radios = popover.querySelectorAll('input[type="radio"]');
             for (const radio of radios) {
-              // Get the label text
-              const label = radio.closest('label') || 
-                          document.querySelector(`label[for="${radio.id}"]`) ||
-                          radio.parentElement?.querySelector('label');
+              // Get the label text - try multiple ways
+              let labelText = '';
               
-              if (label) {
-                const text = label.textContent?.trim().toLowerCase() || '';
-                if (text.includes('yesterday')) {
-                  radio.click();
-                  return true;
+              // Method 1: Check closest label
+              const closestLabel = radio.closest('label');
+              if (closestLabel) {
+                labelText = closestLabel.textContent?.trim().toLowerCase() || '';
+              }
+              
+              // Method 2: Check label with matching for attribute
+              if (!labelText && radio.id) {
+                const labelFor = document.querySelector(`label[for="${radio.id}"]`);
+                if (labelFor) {
+                  labelText = labelFor.textContent?.trim().toLowerCase() || '';
                 }
               }
-            }
-            
-            // If no radio found, try clicking label directly
-            const labels = popover.querySelectorAll('label');
-            for (const label of labels) {
-              const text = label.textContent?.trim().toLowerCase() || '';
-              if (text.includes('yesterday')) {
-                label.click();
+              
+              // Method 3: Check parent or sibling label
+              if (!labelText) {
+                const parent = radio.parentElement;
+                const siblingLabel = parent?.querySelector('label');
+                if (siblingLabel) {
+                  labelText = siblingLabel.textContent?.trim().toLowerCase() || '';
+                }
+              }
+              
+              // Check if this is the "Yesterday" option
+              if (labelText.includes('yesterday')) {
+                console.log('Found Yesterday radio button');
+                radio.click();
                 return true;
               }
             }
             
-            return false;
-          });
+            // If no radio found, try clicking labels directly
+            const labels = popover.querySelectorAll('label');
+            for (const label of labels) {
+              const text = label.textContent?.trim().toLowerCase() || '';
+              if (text.includes('yesterday')) {
+                console.log('Found Yesterday label, clicking');
+                label.click();
+                return true;
+              }
+            }
+          }
           
-          if (yesterdayFound) {
-            console.log('  ✅ Selected "Yesterday" radio button');
-            await new Promise(resolve => setTimeout(resolve, 1000));
+          return false;
+        });
+        
+        if (yesterdaySelected) {
+          console.log('  ✅ Selected "Yesterday" radio button');
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // Step 3: Click "Apply" button
+          const applyClicked = await page.evaluate(() => {
+            const popovers = document.querySelectorAll('[id^="a-popover"], .a-popover, [class*="popover"]');
             
-            // Step 3: Click "Apply" button
-            const applyClicked = await page.evaluate(() => {
-              const popover = document.querySelector('#a-popover-1, .a-popover, [id^="a-popover"]');
-              if (!popover) return false;
+            for (const popover of popovers) {
+              const style = window.getComputedStyle(popover);
+              if (style.display === 'none' || style.visibility === 'hidden') continue;
               
               // Look for Apply button
               const buttons = popover.querySelectorAll('button');
               for (const btn of buttons) {
                 const text = btn.textContent?.trim().toLowerCase() || '';
                 if (text === 'apply' || text.includes('apply')) {
+                  console.log('Found Apply button, clicking');
                   btn.click();
                   return true;
                 }
               }
-              return false;
+            }
+            return false;
+          });
+          
+          if (applyClicked) {
+            console.log('  ✅ Clicked "Apply" button');
+            await new Promise(resolve => setTimeout(resolve, 4000)); // Wait longer for page to update
+            dateSetSuccessfully = true;
+            console.log(`  ✅ Date set to ${targetDateDisplay}`);
+            
+            // Verify the date was actually changed by checking the page
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const dateRangeText = await page.evaluate(() => {
+              const allText = document.body.textContent || '';
+              // Check if we see "Yesterday" or the target date in the date range display
+              return allText.includes('Yesterday') || allText.includes('Nov 22 2025');
             });
             
-            if (applyClicked) {
-              console.log('  ✅ Clicked "Apply" button');
-              await new Promise(resolve => setTimeout(resolve, 3000));
-              dateSetSuccessfully = true;
-              console.log(`  ✅ Date set to ${targetDateDisplay}`);
-            } else {
-              console.warn('  ⚠️ Could not find "Apply" button');
+            if (!dateRangeText) {
+              console.warn('  ⚠️ Date range may not have updated - checking again...');
             }
           } else {
-            console.warn('  ⚠️ Could not find "Yesterday" radio button in popup');
+            console.warn('  ⚠️ Could not find "Apply" button');
           }
+        } else {
+          console.warn('  ⚠️ Could not find "Yesterday" radio button in popup');
         }
         
         if (!dateSetSuccessfully) {
           console.warn('  ⚠️ Could not set date to "Yesterday"');
           console.warn(`  ⚠️ WARNING: Data may not be for ${targetDateDisplay}`);
+          console.warn(`  ⚠️ Current data appears to be for "Last 30 Days" based on values`);
           console.warn(`  💡 Data will be labeled as ${targetDateStr} in results, but actual data may differ`);
         }
       } catch (error) {
