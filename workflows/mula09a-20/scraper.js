@@ -757,6 +757,16 @@ export default defineComponent({
               if (extractionAttempts < maxExtractionAttempts) {
                 console.log(`  ⏳ No data found, retrying extraction... (attempt ${extractionAttempts + 1}/${maxExtractionAttempts})`);
                 await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Get fresh page reference
+                try {
+                  const pages = await browser.pages();
+                  page = pages[pages.length - 1];
+                  await page.setViewport({ width: 1920, height: 1080 });
+                } catch (e) {
+                  console.warn('  ⚠️ Could not get fresh page reference');
+                }
+                
                 await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
                   waitUntil: 'domcontentloaded',
                   timeout: 15000
@@ -770,6 +780,23 @@ export default defineComponent({
             extractionAttempts++;
             const errorMsg = evalError.message || String(evalError);
             console.warn(`  ⚠️ Data extraction failed (attempt ${extractionAttempts}): ${errorMsg}`);
+            
+            // If detached frame error, try to recover
+            if (errorMsg.includes('detached') || errorMsg.includes('Frame')) {
+              console.log('  🔄 Detached frame detected, recovering...');
+              try {
+                const pages = await browser.pages();
+                page = pages[pages.length - 1];
+                await page.setViewport({ width: 1920, height: 1080 });
+                await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
+                  waitUntil: 'domcontentloaded',
+                  timeout: 15000
+                });
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              } catch (recoverError) {
+                console.warn(`  ⚠️ Could not recover from detached frame: ${recoverError.message}`);
+              }
+            }
             
             if (extractionAttempts < maxExtractionAttempts) {
               await new Promise(resolve => setTimeout(resolve, 2000));
