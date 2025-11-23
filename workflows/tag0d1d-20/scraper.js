@@ -1,8 +1,8 @@
 /**
- * Amazon Associates Scraper - usmagazine05-20
+ * Amazon Associates Scraper - tag0d1d-20
  * 
- * This workflow scrapes data for Store ID: usmagazine05-20
- * Tracking IDs: mula0f-20
+ * This workflow scrapes data for Store ID: tag0d1d-20
+ * Tracking IDs: twsmm-20, stylcasterm-20, defpenm-20, swimworldm-20, britcom03-20, on3m-20
  * 
  * SETUP:
  * 1. Connect Browserless app in props
@@ -575,7 +575,7 @@ export default defineComponent({
                 
                 // Re-switch Store ID
                 try {
-                  await page.waitForSelector('#a-autoid-0-announce', { timeout: 10000 });
+                  await page.waitForSelector('#a-autoid-0-announce', { timeout: 15000 });
                   const currentStore = await page.$eval('#a-autoid-0-announce > span.a-dropdown-prompt', el => el.textContent.trim());
                   if (!currentStore.includes(STORE_ID)) {
                     await page.click('#a-autoid-0-announce');
@@ -596,7 +596,39 @@ export default defineComponent({
                   console.warn('  ⚠️ Could not re-switch Store ID after recovery');
                 }
                 
-                console.log('  ✅ Recovered with new page');
+                // Re-switch Tracking ID if needed
+                if (trackingId !== STORE_ID || TRACKING_IDS.length > 1) {
+                  try {
+                    await page.waitForSelector('#ac-dropdown-displayreport-trackingIds', { timeout: 10000 });
+                    const currentTracking = await page.$eval('#ac-dropdown-displayreport-trackingIds', el => el.textContent.trim());
+                    if (!currentTracking.includes(trackingId)) {
+                      await page.click('#ac-dropdown-displayreport-trackingIds');
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      const trackingIdFound = await page.evaluate((tid) => {
+                        const popover = document.querySelector('#ac-dropdown-displayreport-trackingIds-popover');
+                        if (popover) {
+                          const options = popover.querySelectorAll('a, li');
+                          for (const option of options) {
+                            const text = option.textContent ? option.textContent.trim() : '';
+                            if (text === tid || text.includes(tid)) {
+                              const clickable = option.closest('a') || option.closest('li') || option;
+                              clickable.click();
+                              return true;
+                            }
+                          }
+                        }
+                        return false;
+                      }, trackingId);
+                      if (trackingIdFound) {
+                        await new Promise(resolve => setTimeout(resolve, 2500));
+                      }
+                    }
+                  } catch (trackingError) {
+                    console.warn('  ⚠️ Could not re-switch Tracking ID after recovery');
+                  }
+                }
+                
+                console.log('  ✅ Recovered with new page, Store ID and Tracking ID restored');
               } catch (recoverError) {
                 console.warn(`  ⚠️ Could not recover from detached frame: ${recoverError.message}`);
               }
