@@ -214,65 +214,154 @@ export default defineComponent({
       
       // Set date range to target date (single day - yesterday by default)
       console.log(`📅 Setting date range to ${targetDateDisplay}...`);
+      let dateSetSuccessfully = false;
+      
       try {
-        const datePickerSelectors = [
-          'input[placeholder*="date" i]',
-          'input[aria-label*="date" i]',
-          '#date-range-picker',
-          '.date-picker',
-          'input[type="date"]',
-          '[data-testid*="date"]',
-          'input[name*="date" i]',
-          '.ac-widget-date-picker input',
-          'input.ac-widget-date-picker-input'
+        // Wait for page to fully load
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Try multiple approaches to set the date
+        const datePickerApproaches = [
+          // Approach 1: Look for date range picker button/link
+          async () => {
+            const dateRangeButtons = [
+              'button[aria-label*="date" i]',
+              'a[aria-label*="date" i]',
+              'button:has-text("Date")',
+              '.ac-widget-date-picker button',
+              '[data-testid*="date-range"]',
+              'button.ac-widget-button:has-text("Last")'
+            ];
+            
+            for (const btnSelector of dateRangeButtons) {
+              try {
+                const btn = await page.$(btnSelector);
+                if (btn) {
+                  console.log(`  Trying date range button: ${btnSelector}`);
+                  await btn.click();
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  
+                  // Look for custom date range option
+                  const customRange = await page.$('a:has-text("Custom"), button:has-text("Custom"), [data-testid*="custom"]');
+                  if (customRange) {
+                    await customRange.click();
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                  }
+                  
+                  // Try to find start date input
+                  const startDateInputs = [
+                    'input[name*="start" i]',
+                    'input[aria-label*="start" i]',
+                    'input[placeholder*="start" i]',
+                    'input[type="date"]',
+                    '.ac-widget-date-picker input'
+                  ];
+                  
+                  for (const inputSelector of startDateInputs) {
+                    try {
+                      const input = await page.$(inputSelector);
+                      if (input) {
+                        await input.click({ clickCount: 3 });
+                        await input.type(targetDateStr, { delay: 30 });
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Try to set end date to same date (single day)
+                        const endDateInputs = [
+                          'input[name*="end" i]',
+                          'input[aria-label*="end" i]',
+                          'input[placeholder*="end" i]'
+                        ];
+                        
+                        for (const endSelector of endDateInputs) {
+                          try {
+                            const endInput = await page.$(endSelector);
+                            if (endInput) {
+                              await endInput.click({ clickCount: 3 });
+                              await endInput.type(targetDateStr, { delay: 30 });
+                              await new Promise(resolve => setTimeout(resolve, 500));
+                              break;
+                            }
+                          } catch (e) {}
+                        }
+                        
+                        // Click apply/submit
+                        const applySelectors = [
+                          'button:has-text("Apply")',
+                          'button[type="submit"]',
+                          'button.ac-widget-button-primary',
+                          '[data-testid="apply"]',
+                          'button:has-text("Go")'
+                        ];
+                        
+                        for (const applySel of applySelectors) {
+                          try {
+                            const applyBtn = await page.$(applySel);
+                            if (applyBtn) {
+                              await applyBtn.click();
+                              await new Promise(resolve => setTimeout(resolve, 3000));
+                              return true;
+                            }
+                          } catch (e) {}
+                        }
+                      }
+                    } catch (e) {}
+                  }
+                }
+              } catch (e) {}
+            }
+            return false;
+          },
+          
+          // Approach 2: Direct input field manipulation
+          async () => {
+            const inputSelectors = [
+              'input[placeholder*="date" i]',
+              'input[aria-label*="date" i]',
+              'input[name*="date" i]',
+              'input[type="date"]',
+              '.ac-widget-date-picker input',
+              'input.ac-widget-date-picker-input'
+            ];
+            
+            for (const selector of inputSelectors) {
+              try {
+                const input = await page.$(selector);
+                if (input) {
+                  console.log(`  Trying direct input: ${selector}`);
+                  await input.click({ clickCount: 3 });
+                  await page.keyboard.press('Backspace');
+                  await input.type(targetDateStr, { delay: 30 });
+                  await page.keyboard.press('Enter');
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  return true;
+                }
+              } catch (e) {}
+            }
+            return false;
+          }
         ];
         
-        let datePickerFound = false;
-        for (const selector of datePickerSelectors) {
+        // Try each approach
+        for (let attempt = 0; attempt < datePickerApproaches.length; attempt++) {
           try {
-            const datePicker = await page.$(selector);
-            if (datePicker) {
-              console.log(`  Found date picker with selector: ${selector}`);
-              await datePicker.click();
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              await datePicker.click({ clickCount: 3 });
-              await datePicker.type(targetDateStr, { delay: 50 });
-              await new Promise(resolve => setTimeout(resolve, 500));
-              
-              const applyButtons = [
-                'button[type="submit"]',
-                'button:has-text("Apply")',
-                'button:has-text("Go")',
-                '.apply-button',
-                '[data-testid="apply"]',
-                'button.ac-widget-button-primary'
-              ];
-              
-              for (const btnSelector of applyButtons) {
-                try {
-                  const applyBtn = await page.$(btnSelector);
-                  if (applyBtn) {
-                    await applyBtn.click();
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    datePickerFound = true;
-                    console.log(`  ✅ Date set to ${targetDateDisplay}`);
-                    break;
-                  }
-                } catch (e) {}
-              }
-              if (datePickerFound) break;
+            dateSetSuccessfully = await datePickerApproaches[attempt]();
+            if (dateSetSuccessfully) {
+              console.log(`  ✅ Date set to ${targetDateDisplay} using approach ${attempt + 1}`);
+              break;
             }
-          } catch (e) {}
+          } catch (error) {
+            console.warn(`  ⚠️ Approach ${attempt + 1} failed: ${error.message}`);
+          }
         }
         
-        if (!datePickerFound) {
-          console.warn('  ⚠️ Could not find date picker - using default date range');
-          console.warn(`  💡 Amazon may show yesterday by default, or you may need to manually set the date`);
-          console.warn(`  💡 Data will be labeled as ${targetDateStr} in results`);
+        if (!dateSetSuccessfully) {
+          console.warn('  ⚠️ Could not set date picker - Amazon may be using default date range');
+          console.warn(`  ⚠️ WARNING: Data may not be for ${targetDateDisplay}`);
+          console.warn(`  💡 Data will be labeled as ${targetDateStr} in results, but actual data may differ`);
         }
       } catch (error) {
-        console.warn(`  ⚠️ Could not set date range: ${error.message}`);
-        console.warn(`  💡 Continuing with default date range - data will be labeled as ${targetDateStr}`);
+        console.warn(`  ⚠️ Error setting date range: ${error.message}`);
+        console.warn(`  ⚠️ WARNING: Data may not be for ${targetDateDisplay}`);
       }
       
       // Process each Tracking ID
