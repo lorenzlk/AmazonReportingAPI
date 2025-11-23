@@ -90,7 +90,7 @@ export default defineComponent({
       return false;
     };
     
-    // Helper function to login (optimized for speed)
+    // Helper function to login - navigates directly to reports page
     const login = async () => {
       if (isLoggedIn) return true;
       
@@ -100,7 +100,8 @@ export default defineComponent({
           await page.setViewport({ width: 1920, height: 1080 });
         }
         
-        console.log('🔐 Checking login status...');
+        console.log('🔐 Logging in to reports page...');
+        // Navigate directly to reports page - this IS the reports page
         await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
           waitUntil: 'domcontentloaded',
           timeout: 20000
@@ -110,13 +111,14 @@ export default defineComponent({
         const isLoginPage = currentUrl.includes('signin') || currentUrl.includes('ap/signin');
         
         if (!isLoginPage) {
+          // Check if we're on the reports page (already logged in)
           try {
             await page.waitForSelector('#a-autoid-0-announce, #ac-report-commission-commision-total', { timeout: 5000 });
-            console.log('✅ Already logged in!');
+            console.log('✅ Already logged in and on reports page!');
             isLoggedIn = true;
             return true;
           } catch (e) {
-            console.log('📝 Dashboard not found, need to login...');
+            console.log('📝 Reports page not fully loaded, checking login status...');
           }
         }
         
@@ -129,16 +131,20 @@ export default defineComponent({
           await page.waitForSelector('#ap_password', { timeout: 10000 });
           await page.type('#ap_password', password, { delay: 20 });
           await page.click('#signInSubmit');
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
+          // After login, we should be redirected to reports page, but verify
           const loginUrl = page.url();
           if (loginUrl.includes('signin') || loginUrl.includes('ap/signin')) {
+            // Still on login page, navigate to reports
             await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
               waitUntil: 'domcontentloaded',
-              timeout: 8000
+              timeout: 10000
             });
           }
-          console.log('✅ Login successful!');
+          // Wait for reports page to load
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log('✅ Login successful! Now on reports page.');
         }
         isLoggedIn = true;
         return true;
@@ -198,14 +204,9 @@ export default defineComponent({
         console.warn(`  ⚠️ Could not switch to Store ID ${STORE_ID}: ${error.message}`);
       }
       
-      // Navigate to reports page (using default Last 30 Days date range)
-      await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
-        waitUntil: 'domcontentloaded',
-        timeout: 15000
-      });
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // We're already on the reports page after login - no need to navigate again
       console.log('📅 Using default date range (Last 30 Days) - no date picker manipulation');
+      console.log('📍 Already on reports page, proceeding to switch Store ID and Tracking ID...');
       
       // Process each Tracking ID
       for (let trackingIndex = 0; trackingIndex < TRACKING_IDS.length; trackingIndex++) {
@@ -501,20 +502,25 @@ export default defineComponent({
                 console.log(`  ⏳ No data found, retrying extraction... (attempt ${extractionAttempts + 1}/${maxExtractionAttempts})`);
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 
-                // Get fresh page reference
+                // Get fresh page reference if needed
                 try {
-                  const pages = await browser.pages();
-                  page = pages[pages.length - 1];
-                  await page.setViewport({ width: 1920, height: 1080 });
+                  if (page.isClosed()) {
+                    const pages = await browser.pages();
+                    page = pages[pages.length - 1];
+                    await page.setViewport({ width: 1920, height: 1080 });
+                    await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
+                      waitUntil: 'domcontentloaded',
+                      timeout: 15000
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                  } else {
+                    // Just refresh the page
+                    await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                  }
                 } catch (e) {
-                  console.warn('  ⚠️ Could not get fresh page reference');
+                  console.warn('  ⚠️ Could not refresh page');
                 }
-                
-                await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
-                  waitUntil: 'domcontentloaded',
-                  timeout: 15000
-                });
-                await new Promise(resolve => setTimeout(resolve, 2000));
               } else {
                 console.warn(`  ⚠️ No data found after ${maxExtractionAttempts} attempts, using empty data`);
               }
@@ -528,9 +534,12 @@ export default defineComponent({
             if (errorMsg.includes('detached') || errorMsg.includes('Frame')) {
               console.log('  🔄 Detached frame detected, recovering...');
               try {
-                const pages = await browser.pages();
-                page = pages[pages.length - 1];
-                await page.setViewport({ width: 1920, height: 1080 });
+                if (page.isClosed()) {
+                  const pages = await browser.pages();
+                  page = pages[pages.length - 1];
+                  await page.setViewport({ width: 1920, height: 1080 });
+                }
+                // Refresh the reports page
                 await page.goto('https://affiliate-program.amazon.com/p/reporting/earnings', {
                   waitUntil: 'domcontentloaded',
                   timeout: 15000
