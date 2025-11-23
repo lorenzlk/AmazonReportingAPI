@@ -22,12 +22,65 @@ export default defineComponent({
   async run({ steps, $ }) {
     console.log('📊 Adding usmagazine05-20 data to Google Sheets...');
     
-    // Get results from scraper step
-    const scraperStep = steps["Scraper - usmagazine05-20"] || steps.trigger;
-    const scraperData = scraperStep?.results || scraperStep;
+    // Debug: Log available step names
+    console.log('Available steps:', Object.keys(steps));
     
-    if (!scraperData || !scraperData.results) {
-      throw new Error('No results found from scraper step. Make sure to reference the correct step name.');
+    // Try multiple step name patterns to find the scraper step
+    const possibleStepNames = [
+      "Scraper - usmagazine05-20",
+      "scraper",
+      "Scraper",
+      "Amazon Scraper",
+      "Amazon Associates Scraper",
+      "usmagazine05-20 Scraper"
+    ];
+    
+    let scraperStep = null;
+    let scraperData = null;
+    
+    // First, try the expected step name
+    for (const stepName of possibleStepNames) {
+      if (steps[stepName]) {
+        console.log(`Found scraper step: ${stepName}`);
+        scraperStep = steps[stepName];
+        break;
+      }
+    }
+    
+    // If not found, try to find any step that has results
+    if (!scraperStep) {
+      console.log('⚠️ Scraper step not found by name, searching all steps...');
+      for (const [stepName, stepData] of Object.entries(steps)) {
+        if (stepData && (stepData.results || (stepData.$return_value && stepData.$return_value.results))) {
+          console.log(`Found step with results: ${stepName}`);
+          scraperStep = stepData;
+          break;
+        }
+      }
+    }
+    
+    // If still not found, try steps.trigger
+    if (!scraperStep) {
+      console.log('⚠️ Trying steps.trigger as fallback...');
+      scraperStep = steps.trigger;
+    }
+    
+    if (!scraperStep) {
+      console.error('❌ Available steps:', Object.keys(steps));
+      throw new Error('No scraper step found. Available steps: ' + Object.keys(steps).join(', '));
+    }
+    
+    // Extract results from the step
+    scraperData = scraperStep.results || scraperStep.$return_value || scraperStep;
+    
+    if (!scraperData) {
+      console.error('❌ Scraper step data:', scraperStep);
+      throw new Error('No data found in scraper step. Step structure: ' + JSON.stringify(Object.keys(scraperStep || {})));
+    }
+    
+    if (!scraperData.results) {
+      console.error('❌ Scraper data structure:', scraperData);
+      throw new Error('No results property found. Data structure: ' + JSON.stringify(Object.keys(scraperData || {})));
     }
     
     const results = scraperData.results;
