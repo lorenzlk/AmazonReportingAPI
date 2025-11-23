@@ -587,7 +587,7 @@ export default defineComponent({
         };
         
         const result = {
-          date: targetDateStr,
+          date: dateStr, // Label with today's date (data is Last 30 Days)
           storeId: STORE_ID,
           trackingId: trackingId,
           accountName: trackingId,
